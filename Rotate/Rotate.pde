@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 String transformMode = "";
+Target preTransformTarget = new Target();
 int index = 0;
 
 //your input code should modify these!!
@@ -21,6 +22,7 @@ boolean userDone = false;
 static final int DPI = 276;
 static final int SCREEN_WIDTH = round(DPI * 2);
 static final int SCREEN_HEIGHT = round(DPI * 3.5);
+static final float RAD_2_DEG = 180 / (float) Math.PI;
 
 private class Target {
   float x = 0;
@@ -102,15 +104,16 @@ void draw() {
 
   popMatrix();
 
-  scaffoldControlLogic(); //you are going to want to replace this!
-
   text("Trial " + (trialIndex+1) + " of " +trialCount, width/2, inchesToPixels(.5f));
 }
 
 void mousePressed() {
   loadPixels();
-  if (pixels[mouseY * SCREEN_WIDTH + mouseX] == color(0))
+  if (pixels[mouseY * SCREEN_WIDTH + mouseX] == color(0)) {
     transformMode = "rotate";
+    preTransformTarget.rotation = targets.get(trialIndex).rotation;
+  }
+
 }
 
 void mouseDragged() {
@@ -142,7 +145,8 @@ void mouseReleased() {
 }
 
 void setRotation() {
-
+  Target t = targets.get(trialIndex);
+  t.rotation = preTransformTarget.rotation + (atan2(mouseY - t.y, mouseX - t.x) * RAD_2_DEG);
 }
 
 public boolean checkForSuccess() {
