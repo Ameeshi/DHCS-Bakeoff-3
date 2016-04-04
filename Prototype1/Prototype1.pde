@@ -1,16 +1,20 @@
 import java.util.ArrayList;
 import java.util.Collections;
 
+// Static vars
 static final int DPI = 276;
 static final int NUM_TRIALS = 20; // this will be set higher for the bakeoff
 static final float BORDER = inchesToPixels(.2f); // have some padding from the sides
-static final float DESTINATION_SIZE = 100f;
+static final float DESTINATION_SIZE = 50f;
 static final float DESTINATION_ROTATION = 0f;
-static final int DESTINATION_COLOR = 0x80FFFFFF;
-static final int TARGET_COLOR = 0xFFFF0000;
-static final int BACKGROUND_COLOR = 0xFF000000;
-static final int LINE_COLOR = 0x00000000;
 
+// Colors vars
+static final int DESTINATION_COLOR  = 0x80FFFFFF;
+static final int TARGET_COLOR       = 0xFFFF0000;
+static final int BACKGROUND_COLOR   = 0xFF000000;
+static final int LINE_COLOR         = 0x00000000;
+
+// Instance vars
 String transformMode = "";
 Target transformDelta = new Target();
 ArrayList<Target> targets = new ArrayList<Target>();
@@ -67,7 +71,6 @@ void drawTarget() {
   translate(t.x, t.y);
   rotate(radians(t.rotation));
   fill(TARGET_COLOR);
-  println("TZ is" + t.z);
   rect(0, 0, t.z, t.z);
   fill(LINE_COLOR);
   stroke(125);
@@ -95,11 +98,7 @@ void drawDestination() {
 
 void mousePressed() {
   Target t = targets.get(trialIndex).add(transformDelta);
-  println("\nColor @ cursor: 0x" + Integer.toHexString(colorAtCursor())
-    + "\nTarget color: 0x" + Integer.toHexString(TARGET_COLOR)
-    + "\nDestination color: 0x" + Integer.toHexString(DESTINATION_COLOR)
-    + "\nOverlap color: 0x" + Integer.toHexString(blendColors(DESTINATION_COLOR, TARGET_COLOR))
-  );
+
   if (colorAtCursor() != TARGET_COLOR
       && colorAtCursor() != blendColors(DESTINATION_COLOR, TARGET_COLOR)) {
     // User clicked outside of target square, AKA rotate mode
