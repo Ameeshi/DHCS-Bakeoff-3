@@ -9,6 +9,7 @@ static final float DESTINATION_ROTATION = 0f;
 static final int DESTINATION_COLOR = 0x80FFFFFF;
 static final int TARGET_COLOR = 0xFFFF0000;
 static final int BACKGROUND_COLOR = 0xFF000000;
+static final int LINE_COLOR = 0x00000000;
 
 String transformMode = "";
 Target transformDelta = new Target();
@@ -66,7 +67,14 @@ void drawTarget() {
   translate(t.x, t.y);
   rotate(radians(t.rotation));
   fill(TARGET_COLOR);
+  println("TZ is" + t.z);
   rect(0, 0, t.z, t.z);
+  fill(LINE_COLOR);
+  stroke(125);
+  line(0, 0, 0, t.z);
+  line(0, 0, 0, -t.z);
+  line(0, 0, -t.z, 0);
+  line(0, 0, t.z, 0);
   popMatrix();
 }
 
@@ -76,6 +84,12 @@ void drawDestination() {
   rotate(radians(DESTINATION_ROTATION));
   fill(DESTINATION_COLOR);
   rect(0, 0, DESTINATION_SIZE, DESTINATION_SIZE);
+  fill(LINE_COLOR);
+  stroke(125);
+  line(0, 0, 0, DESTINATION_SIZE);
+  line(0, 0, 0, -DESTINATION_SIZE);
+  line(0, 0, -DESTINATION_SIZE, 0);
+  line(0, 0, DESTINATION_SIZE, 0);
   popMatrix();
 }
 
