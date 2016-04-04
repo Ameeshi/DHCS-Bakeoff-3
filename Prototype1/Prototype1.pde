@@ -4,7 +4,7 @@ import java.util.Collections;
 static final int DPI = 276;
 static final int NUM_TRIALS = 20; // this will be set higher for the bakeoff
 static final float BORDER = inchesToPixels(.2f); // have some padding from the sides
-static final float DESTINATION_SIZE = 50f;
+static final float DESTINATION_SIZE = 100f;
 static final float DESTINATION_ROTATION = 0f;
 static final int DESTINATION_COLOR = 0x80FFFFFF;
 static final int TARGET_COLOR = 0xFFFF0000;
@@ -80,16 +80,39 @@ void drawDestination() {
 }
 
 void mousePressed() {
-  loadPixels();
-  if (pixels[mouseY * width + mouseX] != color(TARGET_COLOR)) {
+  Target t = targets.get(trialIndex).add(transformDelta);
+  println("\nColor @ cursor: 0x" + Integer.toHexString(colorAtCursor())
+    + "\nTarget color: 0x" + Integer.toHexString(TARGET_COLOR)
+    + "\nDestination color: 0x" + Integer.toHexString(DESTINATION_COLOR)
+    + "\nOverlap color: 0x" + Integer.toHexString(blendColors(DESTINATION_COLOR, TARGET_COLOR))
+  );
+  if (colorAtCursor() != TARGET_COLOR
+      && colorAtCursor() != blendColors(DESTINATION_COLOR, TARGET_COLOR)) {
+    // User clicked outside of target square, AKA rotate mode
     transformMode = "rotate";
+  } else if (dist(t.x, t.y, mouseX, mouseY) > (t.z / 2)) {
+    // User clicked inside the square but on a corner, AKA resize mode
+    transformMode = "resize";
+  } else {
+    // User clicked inside square not on a corner, AKA move mode
+    transformMode = "move";
   }
 }
 
 void mouseDragged() {
+  Target t1 = targets.get(trialIndex);
+  Target t2 = t1.add(transformDelta);
   if (transformMode == "rotate") {
-    Target t = targets.get(trialIndex).add(transformDelta);
-    transformDelta.rotation = degrees(atan2(mouseY - t.y, mouseX - t.x));
+    // Needs some work
+    transformDelta.rotation = degrees(atan2(mouseY - t2.y, mouseX - t2.x));
+  } else if (transformMode == "resize") {
+    // Scale by distance mouse has moved, make negative if mouse went up or left
+    // TODO have to check how much they've moved towards/away from center of target
+    t1.z = dist(mouseX, mouseY, t2.x, t2.y);
+  } else if (transformMode == "move") {
+    // Just set our transform to the delta in mouse movement
+    transformDelta.x += mouseX - pmouseX;
+    transformDelta.y += mouseY - pmouseY;
   }
 }
 
@@ -98,7 +121,7 @@ void mouseReleased() {
   transformMode = "";
 
   // check to see if user clicked middle of screen
-  if (dist(width/2, height/2, mouseX, mouseY) < inchesToPixels(.5f)) {
+  if (dist(width/2, height/2, mouseX, mouseY) < inchesToPixels(0)) {
     // check for incorrect placement
     if (!checkForSuccess()) errorCount++;
 
@@ -114,6 +137,15 @@ void mouseReleased() {
 }
 
 static float inchesToPixels(float inch) { return inch * DPI; }
+int blendColors(int fg, int bg) {
+  int alpha = fg >> 24;
+  int inv_alpha = 255 - (fg >> 24);
+  int r = (int) (alpha * red(fg)    + inv_alpha * red(bg));
+  int g = (int) (alpha * green(fg)  + inv_alpha * green(bg));
+  int b = (int) (alpha * blue(fg)   + inv_alpha * blue(bg));
+  return 0xFF << 24 | r << 16 | g << 8 | b;
+}
+int colorAtCursor() { loadPixels(); return pixels[mouseY * width + mouseX]; }
 
 boolean checkForSuccess() {
   Target t = targets.get(trialIndex);
