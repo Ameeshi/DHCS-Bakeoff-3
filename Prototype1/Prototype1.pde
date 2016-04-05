@@ -2,7 +2,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 // Static vars
-static final int DPI = 276;
+// static final int DPI = 276; // for jake's laptop
+static final int DPI = 199; // for loaner android
 static final int NUM_TRIALS = 20; // this will be set higher for the bakeoff
 static final float BORDER = inchesToPixels(.2f); // have some padding from the sides
 static final float DESTINATION_SIZE = 50f;
