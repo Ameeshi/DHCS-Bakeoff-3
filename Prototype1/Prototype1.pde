@@ -120,7 +120,6 @@ void mouseDragged() {
     transformDelta.rotation = degrees(atan2(mouseY - t2.y, mouseX - t2.x));
   } else if (transformMode == "resize") {
     // Scale by distance mouse has moved, make negative if mouse went up or left
-    // TODO have to check how much they've moved towards/away from center of target
     t1.z = dist(mouseX, mouseY, t2.x, t2.y);
   } else if (transformMode == "move") {
     // Just set our transform to the delta in mouse movement
