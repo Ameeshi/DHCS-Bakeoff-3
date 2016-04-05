@@ -36,7 +36,8 @@ boolean userDone = false;
 Scrollbar xInput, yInput, zInput, rInput;
 
 void setup() {
-  surface.setSize(SCREEN_WIDTH, SCREEN_HEIGHT); //set this, based on your sceen's PPI to be a 2x3.5" area.
+  //surface.setSize(SCREEN_WIDTH, SCREEN_HEIGHT); //set this, based on your sceen's PPI to be a 2x3.5" area.
+  size(round(DPI * 2), round(DPI * 3.5));
 
   textFont(createFont("Arial", inchesToPixels(.15f))); //sets the font to Arial that is .3" tall
   textAlign(CENTER);
