@@ -198,7 +198,6 @@ class Scrollbar {
   float sliderPos, newSliderPos;      // Position of slider
   float targetPos;
   float min, max;                     // Max and min slider positions
-  int baseWeight;                         // How much effort it takes to slide
   boolean orientation;                // Vertical = true, horizontal = false
   boolean hovered;                    // Is mouse over slider?
   boolean stillScroll;                // Continue scrolling?
@@ -214,7 +213,6 @@ class Scrollbar {
     min = orientation ? y : x;
     max = orientation ? y + h - w : x + w - h;
     targetPos = (max + min) / 2;
-    baseWeight = 10;
   }
 
   private void update() {
@@ -223,17 +221,14 @@ class Scrollbar {
     if (!mousePressed) stillScroll = false;
     if (stillScroll) newSliderPos = constrain(orientation ? mouseY-barWidth/2 : mouseX-barHeight/2, min, max);
     else newSliderPos = sliderPos;
-    if (abs(newSliderPos - sliderPos) > 1) sliderPos += (newSliderPos - sliderPos) / scaleWeight();
+    if (abs(newSliderPos - sliderPos) > 1) sliderPos += (newSliderPos - sliderPos) / calcWeight();
   }
 
-  private float scaleWeight() {
+  private float calcWeight() {
     float sp = map(sliderPos, min, max, 0, 100);
     float tp = map(targetPos, min, max, 0, 100);
     float d = abs(sp - tp);
-    float w = 100 - ((9*d*d)/250);
-    // float w = constrain(baseWeight + (3.6*d) - (0.036*d*d), 10, 100);
-    println("sp: " + sp + ", tp: " + tp + ", d: " + d + ", w: " + w);
-    return w;
+    return 100 - ((9*d*d)/250); // Obtained from https://www.wolframalpha.com/input/?i=quadratic+fit+%7B-50,+10%7D,%7B0,+100%7D,%7B50,+10%7D
   }
 
   void draw() {
