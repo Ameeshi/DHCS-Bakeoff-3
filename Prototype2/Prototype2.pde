@@ -2,8 +2,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 // Static vars
-static final int DPI = 276; // for jake's laptop
-// static final int DPI = 199; // for loaner android
+// static final int DPI = 276; // for jake's laptop
+static final int DPI = 199; // for loaner android
 static final int SCREEN_WIDTH = round(DPI * 2);
 static final int SCREEN_HEIGHT = round(DPI * 3.5);
 static final int NUM_TRIALS = 20; // this will be set higher for the bakeoff
@@ -22,10 +22,11 @@ static final int DESTINATION_COLOR  = 0x80FFFFFF;
 static final int TARGET_COLOR       = 0xFFFF0000;
 static final int BACKGROUND_COLOR   = 0xFF000000;
 static final int FOREGROUND_COLOR   = 0xFFCCCCCC;
+static final int SUCCESS_COLOR      = 0xFFDFF2BF;
 static final int LINE_COLOR         = 0xFF000000;
 static final int SCROLLBAR_BG_COLOR = 0xFFCCCCCC;
-static final int SCROLLBAR_FG_COLOR = 0x80000000;
-static final int SCROLLBAR_HL_COLOR = 0x80333333;
+static final int SCROLLBAR_FG_COLOR = 0x80333333;
+static final int SCROLLBAR_HL_COLOR = 0x80000000;
 
 // Instance vars
 ArrayList<Target> targets = new ArrayList<Target>();
@@ -108,10 +109,10 @@ void drawDestination() {
 }
 
 void updateInputs() {
-  xInput.draw();
-  yInput.draw();
-  zInput.draw();
-  rInput.draw();
+  xInput.draw(checkForSuccess(true)[0]);
+  yInput.draw(checkForSuccess(true)[1]);
+  zInput.draw(checkForSuccess(true)[2]);
+  rInput.draw(checkForSuccess(true)[3]);
   rectMode(CENTER);
 
   Target t = targets.get(trialIndex);
@@ -127,7 +128,8 @@ void mouseReleased() {
   // check to see if user clicked middle of screen
   if (dist(width/2, SCREEN_HEIGHT/2, mouseX, mouseY) < inchesToPixels(.2f)) {
     // check for incorrect placement
-    if (!checkForSuccess()) errorCount++;
+    boolean[] results = checkForSuccess(false);
+    if (!(results[0] && results[1] && results[2]) && results[3]) errorCount++;
 
     // move on to next trial
     nextTrial();
@@ -149,19 +151,28 @@ void nextTrial() {
 
 static float inchesToPixels(float inch) { return inch * DPI; }
 
-boolean checkForSuccess() {
+boolean[] checkForSuccess(boolean dryRun) {
   Target t = targets.get(trialIndex);
-  float d = dist(SCREEN_WIDTH/2 + t.x, SCREEN_HEIGHT/2 + t.y, SCREEN_WIDTH/2, SCREEN_HEIGHT/2);
-  float r = angleDist(t.rotation, DESTINATION_ROTATION);
+  float x = abs(t.x);
+  float y = abs(t.y);
+  // float x = abs(SCREEN_WIDTH/2 + t.x - SCREEN_WIDTH/2);
+  // float y = abs(SCREEN_HEIGHT/2 + t.y - SCREEN_HEIGHT/2);
   float z = abs(t.z - DESTINATION_SIZE);
-  boolean withinDistance  = d <  inchesToPixels(.05f); // has to be within .1"
-  boolean withinRotation  = r <= 5;                    // has to be within 5*
-  boolean withinSize      = z <  inchesToPixels(.05f); // has to be within .1"
-  println("Close Enough Distance: " + withinDistance + " (dist=" + d / DPI + "in)");
-  println("Close Enough Rotation: " + withinRotation + " (dist=" + r + ")");
-  println("Close Enough Z: " + withinSize);
+  float r = angleDist(t.rotation, DESTINATION_ROTATION);
+  boolean withinX  = x <  inchesToPixels(.05f); // has to be within .1"
+  boolean withinY  = y <  inchesToPixels(.05f); // has to be within .1"
+  boolean withinZ  = z <  inchesToPixels(.05f); // has to be within .1"
+  boolean withinR  = r <= 5;                    // has to be within 5*
 
-  return withinDistance && withinRotation && withinSize;
+  if (!dryRun) {
+    println("Close Enough X: " + withinX + " (dist=" + x/DPI + "in)");
+    println("Close Enough Y: " + withinY + " (dist=" + y/DPI + "in)");
+    println("Close Enough R: " + withinZ + " (dist=" + z/DPI + "in)");
+    println("Close Enough Z: " + withinR + " (dist=" + r     + "deg)");
+  }
+
+  boolean[] results = { withinX, withinY, withinZ, withinR };
+  return results;
 }
 
 float angleDist(float a1, float a2) {
@@ -216,38 +227,49 @@ class Scrollbar {
   }
 
   private void update() {
-    hovered = barX < mouseX && mouseX < barX + barWidth && barY < mouseY && mouseY < barY + barHeight;
+    hovered = orientation
+      ? (barX <= mouseX && mouseX <= barX + barWidth && sliderPos <= mouseY && mouseY <= sliderPos + barWidth)
+      : (barY <= mouseY && mouseY <= barY + barHeight && sliderPos <= mouseX && mouseX <= sliderPos + barHeight);
     if (mousePressed && hovered) stillScroll = true;
     if (!mousePressed) stillScroll = false;
     if (stillScroll) newSliderPos = constrain(orientation ? mouseY-barWidth/2 : mouseX-barHeight/2, min, max);
     else newSliderPos = sliderPos;
-    if (abs(newSliderPos - sliderPos) > 1) sliderPos += (newSliderPos - sliderPos) / calcWeight();
+    if (abs(newSliderPos - sliderPos) > 1) sliderPos += (newSliderPos - sliderPos);
   }
 
-  private float calcWeight() {
-    float sp = map(sliderPos, min, max, 0, 100);
-    float tp = map(targetPos, min, max, 0, 100);
-    float d = abs(sp - tp);
-    return 100 - ((9*d*d)/250); // Obtained from https://www.wolframalpha.com/input/?i=quadratic+fit+%7B-50,+10%7D,%7B0,+100%7D,%7B50,+10%7D
-  }
-
-  void draw() {
+  void draw(boolean onTarget) {
     update();
+
     rectMode(CORNER);
     noStroke();
     fill(SCROLLBAR_BG_COLOR);
     rect(barX, barY, barWidth, barHeight);
+
+    float offset = 0;
     if (orientation) {
-      fill(TARGET_COLOR);
+      // Draw target
+      stroke(TARGET_COLOR);
+      strokeWeight(4);
+      noFill();
       rect(barX, targetPos, barWidth, barWidth);
-      fill((hovered || stillScroll) ? SCROLLBAR_HL_COLOR : SCROLLBAR_FG_COLOR);
-      rect(barX, sliderPos, barWidth, barWidth);
-    }
-    else {
-      fill(TARGET_COLOR);
+      noStroke();
+
+      // Draw scroller
+      fill(onTarget ? SUCCESS_COLOR : (hovered || stillScroll ? SCROLLBAR_HL_COLOR : SCROLLBAR_FG_COLOR));
+      if (false && stillScroll) offset = 50 * (barX < SCREEN_WIDTH/2 ? 1 : -1);
+      rect(barX + offset, sliderPos, barWidth, barWidth);
+    } else {
+      // Draw target
+      stroke(TARGET_COLOR);
+      strokeWeight(4);
+      noFill();
       rect(targetPos, barY, barHeight, barHeight);
-      fill((hovered || stillScroll) ? SCROLLBAR_HL_COLOR : SCROLLBAR_FG_COLOR);
-      rect(sliderPos, barY, barHeight, barHeight);
+      noStroke();
+
+      // Draw scroller
+      fill(onTarget ? SUCCESS_COLOR : (hovered || stillScroll ? SCROLLBAR_HL_COLOR : SCROLLBAR_FG_COLOR));
+      if (false && stillScroll) offset = 50 * (barY < SCREEN_HEIGHT/2 ? 1 : -1);
+      rect(sliderPos, barY + offset, barHeight, barHeight);
     }
   }
 
