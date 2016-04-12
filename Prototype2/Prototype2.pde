@@ -6,7 +6,7 @@ import java.util.Collections;
 static final int DPI = 199; // for loaner android
 static final int SCREEN_WIDTH = round(DPI * 2);
 static final int SCREEN_HEIGHT = round(DPI * 3.5);
-static final int NUM_TRIALS = 20; // this will be set higher for the bakeoff
+static final int NUM_TRIALS = 2; // this will be set higher for the bakeoff
 static final float BORDER = inchesToPixels(.2f); // have some padding from the sides
 static final float DESTINATION_ROTATION = 0f;
 static final float MIN_X = -SCREEN_WIDTH/2  + BORDER;
@@ -35,12 +35,15 @@ int errorCount = 0;
 int startTime = 0; // time starts when the first click is captured
 int finishTime = 0; //records the time of the final click
 boolean userDone = false;
+boolean trialDone = false;
 Scrollbar xInput, yInput, zInput, rInput;
+float rTransform = 0;
+float rDelta = 0;
 
 public void settings() { size(SCREEN_WIDTH, SCREEN_HEIGHT); }
 
 void setup() {
-  textFont(createFont("Arial", inchesToPixels(.15f))); //sets the font to Arial that is .3" tall
+  textFont(createFont("Arial", inchesToPixels(.1f))); //sets the font to Arial that is .3" tall
   textAlign(CENTER);
 
   //don't change this!
@@ -62,8 +65,8 @@ void setup() {
   // new Scrollbar(x,y,w,h,vertical?)
   xInput = new Scrollbar(margin + offset, margin - thickness/2, width - margin*2 - offset*2, thickness, false);
   yInput = new Scrollbar(margin - thickness/2, margin + offset, thickness, height - margin*2 - offset*2, true);
-  zInput = new Scrollbar(margin + offset, height - margin - thickness/2, width - margin*2 - offset*2, thickness, false);
-  rInput = new Scrollbar(width - margin - thickness/2, margin + offset, thickness, height - margin*2 - offset*2, true);
+  zInput = new Scrollbar(width - margin - thickness/2, margin + offset, thickness, height - margin*2 - offset*2, true);
+  rInput = new Scrollbar(margin + offset, height - margin - thickness/2, width - margin*2 - offset*2, thickness, false);
   nextTrial();
 }
 
@@ -89,7 +92,7 @@ void draw() {
   updateInputs();
 
   // If accurate enough, flash the whole screen green
-  if (checkForSuccess(true)) {
+  if (trialDone) {
     background(SUCCESS_COLOR);
     fill(0);
     text("Click for Next Trial", SCREEN_WIDTH/2, SCREEN_HEIGHT/2);
@@ -100,7 +103,7 @@ void drawTarget() {
   Target t = targets.get(trialIndex);
   pushMatrix();
   translate(SCREEN_WIDTH/2 + t.x, SCREEN_HEIGHT/2 + t.y);
-  rotate(radians(t.r));
+  rotate(radians(t.r - rTransform));
   fill(TARGET_COLOR);
   rect(0, 0, t.z, t.z);
   popMatrix();
@@ -116,7 +119,7 @@ void drawDestination() {
 }
 
 void updateInputs() {
-  boolean[] results = checkForSuccesses(true);
+  boolean[] results = checkEachTarget(true);
   xInput.draw(results[0]);
   yInput.draw(results[1]);
   zInput.draw(results[2]);
@@ -127,45 +130,61 @@ void updateInputs() {
   t.x = map(xInput.val(), xInput.min, xInput.max, MIN_X, MAX_X);
   t.y = map(yInput.val(), yInput.min, yInput.max, MIN_Y, MAX_Y);
   t.z = map(zInput.val(), zInput.min, zInput.max, MIN_Z, MAX_Z);
-  t.r = map(rInput.val(), rInput.min, rInput.max, 0, 360);
+  rTransform = map(rInput.val(), rInput.min, rInput.max, rDelta - 45, rDelta + 45);
 }
 
-int clickCount = 0;
 void mouseReleased() {
-  if (userDone || !checkForSuccess(true) || clickCount++ < 1) return;
-  checkForSuccess(false); // Print debug output just in case
-  nextTrial();
-  clickCount = 0;
-  // check to see if user clicked middle of screen and is accurate enough
-  // if so, then go to the next trial
-  // if (dist(width/2, SCREEN_HEIGHT/2, mouseX, mouseY) < inchesToPixels(0.5f) && checkForSuccess(false))
+  if (userDone) return;
+
+  if (trialDone) {
+    // All inputs on target
+    onAllTargets(false); // Print debug output just in case
+    nextTrial();
+  } else {
+    // At least one input still not on target
+    boolean[] results = checkEachTarget(true);
+    xInput.setLock(results[0]);
+    yInput.setLock(results[1]);
+    zInput.setLock(results[2]);
+    rInput.setLock(results[3]);
+  }
+  trialDone = xInput.locked && yInput.locked && zInput.locked && rInput.locked;
 }
+
+// TODO debugging code
+void keyPressed() { if (key == CODED && keyCode == RIGHT) nextTrial(); }
 
 void nextTrial() {
+  trialIndex++;
+
   if (trialIndex >= NUM_TRIALS) {
     userDone = true;
     finishTime = millis();
     return;
   }
 
-  trialIndex++;
-  xInput.val(map(targets.get(trialIndex).x, MIN_X, MAX_X, xInput.min, xInput.max));
-  yInput.val(map(targets.get(trialIndex).y, MIN_Y, MAX_Y, yInput.min, yInput.max));
-  zInput.val(map(targets.get(trialIndex).z, MIN_Z, MAX_Z, zInput.min, zInput.max));
-  rInput.val(map(targets.get(trialIndex).r, 0, 360, rInput.min, rInput.max));
+  Target t = targets.get(trialIndex);
+  rTransform = 0;
+  rDelta = angleDiff(t.r, DESTINATION_ROTATION) * (t.r % 90 > 45 ? -1 : 1);
+  xInput.val(map(t.x, MIN_X, MAX_X, xInput.min, xInput.max));
+  yInput.val(map(t.y, MIN_Y, MAX_Y, yInput.min, yInput.max));
+  zInput.val(map(t.z, MIN_Z, MAX_Z, zInput.min, zInput.max));
+  rInput.val(map(rTransform, rDelta - 45, rDelta + 45, rInput.min, rInput.max));
 }
 
-boolean checkForSuccess(boolean dryRun) {
-  boolean[] results = checkForSuccesses(dryRun);
-  return results[0] && results[1] && results[2] && results[3];
+boolean onAllTargets(boolean dryRun) {
+  boolean[] results = checkEachTarget(dryRun);
+  for (int i = 0; i < results.length; i++)
+    if (!results[i]) return false;
+  return true;
 }
 
-boolean[] checkForSuccesses(boolean dryRun) {
+boolean[] checkEachTarget(boolean dryRun) {
   Target t = targets.get(trialIndex);
   float x = abs(t.x);
   float y = abs(t.y);
   float z = abs(t.z - DESTINATION_SIZE);
-  float r = angleDist(t.r, DESTINATION_ROTATION);
+  float r = angleDiff(t.r - rTransform, DESTINATION_ROTATION);
   boolean withinX  = x <  inchesToPixels(.05f); // has to be within .1"
   boolean withinY  = y <  inchesToPixels(.05f); // has to be within .1"
   boolean withinZ  = z <  inchesToPixels(.05f); // has to be within .1"
@@ -174,19 +193,17 @@ boolean[] checkForSuccesses(boolean dryRun) {
   if (!dryRun) {
     println("Close Enough X: " + withinX + " (dist=" + x/DPI + "in)");
     println("Close Enough Y: " + withinY + " (dist=" + y/DPI + "in)");
-    println("Close Enough R: " + withinZ + " (dist=" + z/DPI + "in)");
-    println("Close Enough Z: " + withinR + " (dist=" + r     + "deg)");
+    println("Close Enough Z: " + withinZ + " (dist=" + z/DPI + "in)");
+    println("Close Enough R: " + withinR + " (dist=" + r     + "deg)");
   }
 
   boolean[] results = { withinX, withinY, withinZ, withinR };
   return results;
 }
 
-float angleDist(float a1, float a2) {
-  float diff = abs(a1 - a2);
-  diff %= 90;
-  if (diff > 45) return 90 - diff;
-  else return diff;
+float angleDiff(float a1, float a2) {
+  float diff = abs(a1 - a2) % 90;
+  return diff > 45 ? 90 - diff : diff;
 }
 
 static float inchesToPixels(float inch) { return inch * DPI; }
@@ -221,6 +238,7 @@ class Scrollbar {
   boolean orientation;                // Vertical = true, horizontal = false
   boolean hovered;                    // Is mouse over slider?
   boolean stillScroll;                // Continue scrolling?
+  boolean locked;
 
   Scrollbar(float x, float y, int w, int h, boolean o) {
     barX = x;
@@ -233,9 +251,12 @@ class Scrollbar {
     min = orientation ? y : x;
     max = orientation ? y + h - w : x + w - h;
     targetPos = (max + min) / 2;
+    stillScroll = false;
+    locked = false;
   }
 
   private void update() {
+    if (locked) return;
     hovered = orientation
       ? (barX <= mouseX && mouseX <= barX + barWidth && sliderPos <= mouseY && mouseY <= sliderPos + barWidth)
       : (barY <= mouseY && mouseY <= barY + barHeight && sliderPos <= mouseX && mouseX <= sliderPos + barHeight);
@@ -287,6 +308,7 @@ class Scrollbar {
   }
 
   void val(float newPos) {
+    setLock(false);
     sliderPos = newPos;
     newSliderPos = sliderPos;
   }
@@ -294,4 +316,6 @@ class Scrollbar {
   void setTarget(float pos) {
     targetPos = pos;
   }
+
+  void setLock(boolean b) { locked = b; }
 }
