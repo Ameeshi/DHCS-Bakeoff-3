@@ -52,7 +52,7 @@ void setup() {
       random(0, 360) //random rotation between 0 and 360
     );
     targets.add(t);
-    println("created target with " + t.x + "," + t.y + "," + t.rotation + "," + t.z);
+    println("created target with " + t.x + "," + t.y + "," + t.r + "," + t.z);
   }
   Collections.shuffle(targets); // randomize the order of the button; don't change this.
 
@@ -87,13 +87,20 @@ void draw() {
   drawTarget();
   drawDestination();
   updateInputs();
+
+  // If accurate enough, flash the whole screen green
+  if (checkForSuccess(true)) {
+    background(SUCCESS_COLOR);
+    fill(0);
+    text("Click for Next Trial", SCREEN_WIDTH/2, SCREEN_HEIGHT/2);
+  }
 }
 
 void drawTarget() {
   Target t = targets.get(trialIndex);
   pushMatrix();
   translate(SCREEN_WIDTH/2 + t.x, SCREEN_HEIGHT/2 + t.y);
-  rotate(radians(t.rotation));
+  rotate(radians(t.r));
   fill(TARGET_COLOR);
   rect(0, 0, t.z, t.z);
   popMatrix();
@@ -109,56 +116,56 @@ void drawDestination() {
 }
 
 void updateInputs() {
-  xInput.draw(checkForSuccess(true)[0]);
-  yInput.draw(checkForSuccess(true)[1]);
-  zInput.draw(checkForSuccess(true)[2]);
-  rInput.draw(checkForSuccess(true)[3]);
+  boolean[] results = checkForSuccesses(true);
+  xInput.draw(results[0]);
+  yInput.draw(results[1]);
+  zInput.draw(results[2]);
+  rInput.draw(results[3]);
   rectMode(CENTER);
 
   Target t = targets.get(trialIndex);
   t.x = map(xInput.val(), xInput.min, xInput.max, MIN_X, MAX_X);
   t.y = map(yInput.val(), yInput.min, yInput.max, MIN_Y, MAX_Y);
   t.z = map(zInput.val(), zInput.min, zInput.max, MIN_Z, MAX_Z);
-  t.rotation = map(rInput.val(), rInput.min, rInput.max, 0, 360);
+  t.r = map(rInput.val(), rInput.min, rInput.max, 0, 360);
 }
 
+int clickCount = 0;
 void mouseReleased() {
-  if (userDone) return;
-
-  // check to see if user clicked middle of screen
-  if (dist(width/2, SCREEN_HEIGHT/2, mouseX, mouseY) < inchesToPixels(.2f)) {
-    // check for incorrect placement
-    boolean[] results = checkForSuccess(false);
-    if (!(results[0] && results[1] && results[2]) && results[3]) errorCount++;
-
-    // move on to next trial
-    nextTrial();
-
-    if (trialIndex >= NUM_TRIALS) {
-      userDone = true;
-      finishTime = millis();
-    }
-  }
+  if (userDone || !checkForSuccess(true) || clickCount++ < 1) return;
+  checkForSuccess(false); // Print debug output just in case
+  nextTrial();
+  clickCount = 0;
+  // check to see if user clicked middle of screen and is accurate enough
+  // if so, then go to the next trial
+  // if (dist(width/2, SCREEN_HEIGHT/2, mouseX, mouseY) < inchesToPixels(0.5f) && checkForSuccess(false))
 }
 
 void nextTrial() {
+  if (trialIndex >= NUM_TRIALS) {
+    userDone = true;
+    finishTime = millis();
+    return;
+  }
+
   trialIndex++;
   xInput.val(map(targets.get(trialIndex).x, MIN_X, MAX_X, xInput.min, xInput.max));
   yInput.val(map(targets.get(trialIndex).y, MIN_Y, MAX_Y, yInput.min, yInput.max));
   zInput.val(map(targets.get(trialIndex).z, MIN_Z, MAX_Z, zInput.min, zInput.max));
-  rInput.val(map(targets.get(trialIndex).rotation, 0, 360, rInput.min, rInput.max));
+  rInput.val(map(targets.get(trialIndex).r, 0, 360, rInput.min, rInput.max));
 }
 
-static float inchesToPixels(float inch) { return inch * DPI; }
+boolean checkForSuccess(boolean dryRun) {
+  boolean[] results = checkForSuccesses(dryRun);
+  return results[0] && results[1] && results[2] && results[3];
+}
 
-boolean[] checkForSuccess(boolean dryRun) {
+boolean[] checkForSuccesses(boolean dryRun) {
   Target t = targets.get(trialIndex);
   float x = abs(t.x);
   float y = abs(t.y);
-  // float x = abs(SCREEN_WIDTH/2 + t.x - SCREEN_WIDTH/2);
-  // float y = abs(SCREEN_HEIGHT/2 + t.y - SCREEN_HEIGHT/2);
   float z = abs(t.z - DESTINATION_SIZE);
-  float r = angleDist(t.rotation, DESTINATION_ROTATION);
+  float r = angleDist(t.r, DESTINATION_ROTATION);
   boolean withinX  = x <  inchesToPixels(.05f); // has to be within .1"
   boolean withinY  = y <  inchesToPixels(.05f); // has to be within .1"
   boolean withinZ  = z <  inchesToPixels(.05f); // has to be within .1"
@@ -182,24 +189,26 @@ float angleDist(float a1, float a2) {
   else return diff;
 }
 
+static float inchesToPixels(float inch) { return inch * DPI; }
+
 class Target {
   float x;
   float y;
   float z;
-  float rotation;
+  float r;
 
   Target() {
     this.x = 0;
     this.y = 0;
     this.z = 0;
-    this.rotation = 0;
+    this.r = 0;
   }
 
   Target(float x, float y, float z, float r) {
     this.x = x;
     this.y = y;
     this.z = z;
-    this.rotation = r;
+    this.r = r;
   }
 }
 
