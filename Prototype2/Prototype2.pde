@@ -1,12 +1,17 @@
 import java.util.ArrayList;
 import java.util.Collections;
 
+// For vibrate
+import android.content.Context;
+import android.os.Vibrator;
+Vibrator vibrator;
+
 // Static vars
 // static final int DPI = 276; // for jake's laptop
 static final int DPI = 199; // for loaner android
 static final int SCREEN_WIDTH = round(DPI * 2);
 static final int SCREEN_HEIGHT = round(DPI * 3.5);
-static final int NUM_TRIALS = 2; // this will be set higher for the bakeoff
+static final int NUM_TRIALS = 10; // this will be set higher for the bakeoff
 static final float BORDER = inchesToPixels(.2f); // have some padding from the sides
 static final float DESTINATION_ROTATION = 0f;
 static final float MIN_X = -SCREEN_WIDTH/2  + BORDER;
@@ -16,17 +21,20 @@ static final float MAX_Y =  SCREEN_HEIGHT/2 - BORDER;
 static final float MIN_Z = inchesToPixels(.15f);
 static final float MAX_Z = NUM_TRIALS * MIN_Z;
 static final float DESTINATION_SIZE = (MIN_Z + MAX_Z) / 2;
+static final float SLIDING_OFFSET = inchesToPixels(0.75f);
 
 // Colors vars
-static final int DESTINATION_COLOR  = 0x80FFFFFF;
-static final int TARGET_COLOR       = 0xFFFF0000;
-static final int BACKGROUND_COLOR   = 0xFF000000;
-static final int FOREGROUND_COLOR   = 0xFFCCCCCC;
-static final int SUCCESS_COLOR      = 0xFF32CD32;
-static final int LINE_COLOR         = 0xFF000000;
-static final int SCROLLBAR_BG_COLOR = 0xFFCCCCCC;
-static final int SCROLLBAR_FG_COLOR = 0x80333333;
-static final int SCROLLBAR_HL_COLOR = 0x80000000;
+static final int DESTINATION_COLOR      = 0x80FFFFFF;
+static final int TARGET_COLOR           = 0xFFFF0000;
+static final int BACKGROUND_COLOR       = 0xFF000000;
+static final int FOREGROUND_COLOR       = 0xFFCCCCCC;
+static final int SUCCESS_COLOR          = 0xFF32CD32;
+static final int SUCCESS_BG_COLOR       = 0x8032CD32;
+static final int LINE_COLOR             = 0xFF000000;
+static final int SCROLLBAR_BG_COLOR     = 0xFF555555;
+static final int SCROLLBAR_FG_COLOR     = 0x80CCCCCC;
+static final int SCROLLBAR_HL_COLOR     = 0x80999999;
+static final int SCROLLBAR_TARGET_COLOR = 0xFFFFFFFF;
 
 // Instance vars
 ArrayList<Target> targets = new ArrayList<Target>();
@@ -34,6 +42,7 @@ int trialIndex = -1;
 int errorCount = 0;
 int startTime = 0; // time starts when the first click is captured
 int finishTime = 0; //records the time of the final click
+boolean showStartScreen = true;
 boolean userDone = false;
 boolean trialDone = false;
 Scrollbar xInput, yInput, zInput, rInput;
@@ -43,6 +52,8 @@ float rDelta = 0;
 public void settings() { size(SCREEN_WIDTH, SCREEN_HEIGHT); }
 
 void setup() {
+  vibrator = (Vibrator) getActivity().getSystemService(Context.VIBRATOR_SERVICE);
+
   textFont(createFont("Arial", inchesToPixels(.1f))); //sets the font to Arial that is .3" tall
   textAlign(CENTER);
 
@@ -61,22 +72,30 @@ void setup() {
 
   int margin = (int)BORDER/2;
   int offset = 30;
-  int thickness = 40;
+  int thickness = 60;
   // new Scrollbar(x,y,w,h,vertical?)
   xInput = new Scrollbar(margin + offset, margin - thickness/2, width - margin*2 - offset*2, thickness, false);
   yInput = new Scrollbar(margin - thickness/2, margin + offset, thickness, height - margin*2 - offset*2, true);
   zInput = new Scrollbar(width - margin - thickness/2, margin + offset, thickness, height - margin*2 - offset*2, true);
   rInput = new Scrollbar(margin + offset, height - margin - thickness/2, width - margin*2 - offset*2, thickness, false);
-  nextTrial();
 }
 
 void draw() {
   rectMode(CENTER);
-  background(0); // background is dark grey
-  fill(FOREGROUND_COLOR);
   noStroke();
 
-  if (startTime == 0) startTime = millis();
+  if (showStartScreen) {
+    background(SUCCESS_BG_COLOR);
+    fill(0);
+    text("Move the sliders into the white boxes.\n\nYour finger can move\noff the slider during movement.\n\nPhone will vibrate and slider will turn\ngreen when you can lift your finger", SCREEN_WIDTH/2, inchesToPixels(0.2f));
+    text("tap screen to begin", SCREEN_WIDTH/2, SCREEN_HEIGHT/2);
+    return;
+  } else if (startTime == 0) {
+    startTime = millis();
+  }
+
+  background(0); // background is dark grey
+  fill(FOREGROUND_COLOR);
 
   if (userDone) {
     text("User completed " + NUM_TRIALS + " trials", SCREEN_WIDTH/2, inchesToPixels(.2f));
@@ -126,6 +145,11 @@ void updateInputs() {
   rInput.draw(results[3]);
   rectMode(CENTER);
 
+  if ((results[0] && !xInput.locked) || (results[1] && !yInput.locked) ||
+      (results[2] && !zInput.locked) || (results[3] && !rInput.locked)) {
+    vibrator.vibrate(1000/(long)frameRate);
+  }
+
   Target t = targets.get(trialIndex);
   t.x = map(xInput.val(), xInput.min, xInput.max, MIN_X, MAX_X);
   t.y = map(yInput.val(), yInput.min, yInput.max, MIN_Y, MAX_Y);
@@ -139,6 +163,9 @@ void mouseReleased() {
   if (trialDone) {
     // All inputs on target
     onAllTargets(false); // Print debug output just in case
+    nextTrial();
+  } else if (showStartScreen) {
+    showStartScreen = false;
     nextTrial();
   } else {
     // At least one input still not on target
@@ -170,6 +197,12 @@ void nextTrial() {
   yInput.val(map(t.y, MIN_Y, MAX_Y, yInput.min, yInput.max));
   zInput.val(map(t.z, MIN_Z, MAX_Z, zInput.min, zInput.max));
   rInput.val(map(rTransform, rDelta - 45, rDelta + 45, rInput.min, rInput.max));
+
+  boolean[] results = checkEachTarget(true);
+  xInput.setLock(results[0]);
+  yInput.setLock(results[1]);
+  zInput.setLock(results[2]);
+  rInput.setLock(results[3]);
 }
 
 boolean onAllTargets(boolean dryRun) {
@@ -257,13 +290,17 @@ class Scrollbar {
 
   private void update() {
     if (locked) return;
+
     hovered = orientation
       ? (barX <= mouseX && mouseX <= barX + barWidth && sliderPos <= mouseY && mouseY <= sliderPos + barWidth)
       : (barY <= mouseY && mouseY <= barY + barHeight && sliderPos <= mouseX && mouseX <= sliderPos + barHeight);
-    if (mousePressed && hovered) stillScroll = true;
+
     if (!mousePressed) stillScroll = false;
+    else if (mousePressed && hovered) stillScroll = true;
+
     if (stillScroll) newSliderPos = constrain(orientation ? mouseY-barWidth/2 : mouseX-barHeight/2, min, max);
     else newSliderPos = sliderPos;
+
     if (abs(newSliderPos - sliderPos) > 1) sliderPos += (newSliderPos - sliderPos);
   }
 
@@ -277,28 +314,30 @@ class Scrollbar {
 
     float offset = 0;
     if (orientation) {
+      if (mousePressed && stillScroll && !locked) offset = SLIDING_OFFSET * (barX < SCREEN_WIDTH/2 ? 1 : -1);
+
       // Draw target
-      stroke(TARGET_COLOR);
+      stroke(SCROLLBAR_TARGET_COLOR);
       strokeWeight(4);
       noFill();
-      rect(barX, targetPos, barWidth, barWidth);
+      rect(barX + offset, targetPos, barWidth, barWidth);
       noStroke();
 
       // Draw scroller
       fill(onTarget ? SUCCESS_COLOR : (hovered || stillScroll ? SCROLLBAR_HL_COLOR : SCROLLBAR_FG_COLOR));
-      if (false && stillScroll) offset = 50 * (barX < SCREEN_WIDTH/2 ? 1 : -1);
       rect(barX + offset, sliderPos, barWidth, barWidth);
     } else {
+      if (mousePressed && stillScroll &&!locked) offset = SLIDING_OFFSET * (barY < SCREEN_HEIGHT/2 ? 1 : -1);
+
       // Draw target
-      stroke(TARGET_COLOR);
+      stroke(SCROLLBAR_TARGET_COLOR);
       strokeWeight(4);
       noFill();
-      rect(targetPos, barY, barHeight, barHeight);
+      rect(targetPos, barY + offset, barHeight, barHeight);
       noStroke();
 
       // Draw scroller
       fill(onTarget ? SUCCESS_COLOR : (hovered || stillScroll ? SCROLLBAR_HL_COLOR : SCROLLBAR_FG_COLOR));
-      if (false && stillScroll) offset = 50 * (barY < SCREEN_HEIGHT/2 ? 1 : -1);
       rect(sliderPos, barY + offset, barHeight, barHeight);
     }
   }
